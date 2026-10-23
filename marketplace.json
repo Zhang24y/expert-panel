@@ -1,0 +1,18 @@
+{
+  "name": "expert-panel-market",
+  "plugins": [
+    {
+      "name": "expert-panel",
+      "source": "./expert-panel",
+      "version": "0.1.1",
+      "description": "专家团共识评审：多位不同视角专家独立作答→真匿名互评→仲裁归纳（共识率脚本计算、不足自动加辩）→主席综合→事实复核；quick/standard/deep 三档，零配置，结论按一致/分歧分离绝不硬合成。",
+      "displayName": "专家团共识评审",
+      "displayName_i18n": {
+        "zh-CN": "专家团共识评审"
+      },
+      "description_i18n": {
+        "zh-CN": "把重要决策交给多位专家：独立作答→匿名互评→仲裁（共识率脚本计算）→加辩→主席→事实复核，产出稳定结论+明示分歧"
+      }
+    }
+  ]
+}
