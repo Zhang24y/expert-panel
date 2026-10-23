@@ -97,6 +97,7 @@ zcode plugins install expert-panel@<市场名>
 
 版本以插件市场显示为准（事实源在 plugin.json）。
 
+- 0.1.2：台账 schema v2——双口径共识率（rate_pre 仲裁时点 / rate_post 复核后重算，修复旧版 rate 不可复算问题）、逐轮收敛序列、threshold/question_id 等字段全量入账。
 - 0.1.1：修复自定义 ledger_path 为裸文件名时无法落账的边界问题；开源前清理（git 历史中性身份）。
 - 0.1.0：首个可发布版本，六阶段机制全量移植。
 

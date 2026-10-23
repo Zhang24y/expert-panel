@@ -31,6 +31,9 @@ args:
     type: string
     description: 要专家团给出稳定结论的问题/决策
     required: true
+  question_id:
+    type: string
+    description: 题目标识（基准跑批/回溯归因用），默认空
   simulate_failures:
     type: json
     description: 测试用，要模拟作答失败的专家下标数组，默认空
@@ -252,6 +255,8 @@ let consensus = await arbitrator.ask<Consensus>(
   `问题：${question}\n专家表态（匿名）：${JSON.stringify(positionsOf())}\n相互意见：${JSON.stringify(critiques)}\n请归纳共识与分歧。`,
 );
 let rate = computeRate(consensus);
+// 逐轮共识率序列（schema v2：台账记录收敛轨迹）
+const roundsSeq: number[] = [Math.round(rate * 1000) / 1000];
 let round = 1;
 report({ round, rate, target: threshold }, "consensus");
 report({ ratePct: Math.round(rate * 100) + "%", round, alive: `${active.length}/${lenses.length}`, profileLabel: `${profile}` }, "stats");
@@ -281,6 +286,7 @@ while (rate < threshold && round < maxRounds) {
     `第 ${round} 轮专家表态（匿名）：${JSON.stringify(revisedPositions)}\n上一轮归纳：${JSON.stringify(consensus)}\n请重新归纳一致项与分歧项。`,
   );
   rate = computeRate(consensus);
+  roundsSeq.push(Math.round(rate * 1000) / 1000);
   report({ round, rate, target: threshold }, "consensus");
   report({ ratePct: Math.round(rate * 100) + "%", round, alive: `${active.length}/${lenses.length}`, profileLabel: `${profile}` }, "stats");
   log(`第 ${round} 轮收敛后共识率 ${Math.round(rate * 100)}%`);
@@ -308,18 +314,33 @@ const verification = await agent("事实复核员", {
 }).ask<Verification>(`问题语境：${question}\n待复核一致项：${JSON.stringify(consensus.agreed)}${evidenceBlock}${basisBlock}`);
 
 const stable = rate >= threshold;
-// 运行台账：一行 JSONL 追加到 ledger_path（默认 ~/.expert-panel/ledger.jsonl；时间戳由 python 侧生成）
+// schema v2（2026-10-23 P0 修复）：双口径共识率——rate_pre=仲裁时点（复核前）、rate_post=复核后重算，
+// 消除旧版三时点混用（rate 不可复算）问题。tokens 由回填脚本补齐；adopted 为采纳标记预留。
+const ratePre = Math.round(rate * 1000) / 1000;
+const ratePostDenom = verification.agreed.length + consensus.disputed.length;
+const ratePost = ratePostDenom === 0 ? 0 : Math.round((verification.agreed.length / ratePostDenom) * 1000) / 1000;
 const ledgerEntry = {
+  schema: 2,
+  version: "0.1.2",
   question: question.slice(0, 120),
+  question_id: String(args.question_id ?? ""),
   profile,
+  model: "session-default",
   experts: lenses.length,
   alive: active.length,
   rounds: round,
-  rate: Math.round(rate * 1000) / 1000,
+  rounds_seq: roundsSeq,
+  threshold,
+  rate_pre: ratePre,
+  rate_post: ratePost,
+  rate: ratePre,
   agreed: verification.agreed.length,
   disputed: consensus.disputed.length,
   rejected: verification.rejected.length,
+  unverifiable: verification.unverifiable.length,
   stable,
+  tokens: null,
+  adopted: null,
 };
 const LEDGER_CODE = [
   "import sys, json, os, datetime",

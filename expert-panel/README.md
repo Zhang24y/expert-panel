@@ -92,6 +92,7 @@ Expected (within minutes): an "Expert Panel Conclusion" card with a consensus ra
 
 Version is whatever the marketplace shows (the source of truth is plugin.json).
 
+- 0.1.2: ledger schema v2 — dual consensus rates (rate_pre at arbitration time / rate_post recomputed after verification, fixing the old unrecomputable-rate bug), per-round convergence series, and threshold/question_id fields logged in full.
 - 0.1.1: fix ledger write for bare-filename custom paths; pre-release cleanup (neutral git identity).
 - 0.1.0: first releasable version, full six-stage mechanism.
 
