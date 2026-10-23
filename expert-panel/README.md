@@ -1,105 +1,100 @@
-# expert-panel —— 专家团共识评审（ZCode 插件）
+# expert-panel — Expert Panel Consensus Review (ZCode Plugin)
 
-把一个重要决策交给多位不同视角的专家：**独立作答 → 真匿名互评 → 仲裁归纳 → 共识率门控加辩 → 主席综合 → 事实复核**，产出「稳定一致项 + 明示分歧」的结构化结论。零配置，装完即用，所有角色跑在你当前的会话模型上。
+Put an important decision in front of a panel of experts with distinct lenses: **independent answering → truly anonymous cross-critique → arbitration (consensus rate computed deterministically by script, extra debate round when below threshold) → chair synthesis → fact verification**. The output separates **stable agreed conclusions from explicitly stated disagreements**. Zero configuration — every role runs on your current session model.
 
-## 为什么需要它
+## Why
 
-单个模型一次回答的问题：从众（先入为主）、权威偏置（谁名气大听谁的）、硬合成（把分歧和稀泥成"总体可行"）。本工作流逐条对治：
+The failure modes of a single model answer: conformity (anchoring on the first framing), authority bias (deferring to whoever sounds senior), and forced synthesis (mushing disagreement into "generally feasible"). This workflow counters each one:
 
-| 问题 | 对策 |
+| Problem | Countermeasure |
 |---|---|
-| 从众 | 每位专家**先独立作答**，之后才看到别人的立场 |
-| 权威偏置 | 互评输入只有「专家A/B/C」匿名标签 + 立场 + 要点，**不含视角名与模型** |
-| 虚假共识 | 共识率 = 一致项/(一致项+分歧项)，**由脚本确定性计算，不信模型自报** |
-| 和稀泥 | 共识率低于阈值自动加辩一轮；仍不足则**明示分歧交人工裁决，绝不硬合成** |
-| 编造事实 | 可客观验证的一致项由事实复核员核验（能读文件/跑命令就去验），不实剔除 |
+| Conformity | Every expert **answers independently first**, before seeing anyone else's position |
+| Authority bias | Critique inputs contain only anonymous labels (Expert A/B/C) + position + key points — **no lens name, no model** |
+| False consensus | Consensus rate = agreed/(agreed+disputed), **computed deterministically by script — never self-reported by a model** |
+| Splitting the difference | Below threshold → one extra debate round; still below → **disagreements are stated explicitly for human adjudication, never force-merged** |
+| Fabricated facts | Objectively verifiable agreed items are checked by a fact verifier (it reads files / runs commands when it can); failures are dropped |
 
-单专家失败自动容错，结论标注样本完整度（缺席视角/有效专家数）。
+A single expert failing is tolerated; the conclusion is annotated with sample completeness (absent lenses / valid expert count).
 
-## 安装
+## Installation
 
-**本地目录市场**（先把本仓库放到本机任意目录）：
+**Local directory marketplace** (put this repo anywhere on your machine):
 
-1. ZCode → 插件市场 → 添加 → 添加插件市场，粘贴本仓库所在**目录**路径
-2. 个人 → 该市场 → expert-panel → 安装
-3. 新会话生效
+1. ZCode → Plugin Marketplace → Add → Add Plugin Marketplace, paste the repo **directory** path
+2. Personal → the marketplace → expert-panel → Install
+3. Takes effect in a new session
 
-**CLI**（已添加市场后）：
+**CLI** (after the marketplace is added):
 
 ```bash
-zcode plugins install expert-panel@<市场名>
+zcode plugins install expert-panel@<marketplace-name>
 ```
 
-要求：ZCode 桌面版（自带 dynamic workflows 运行时）。台账落盘用到 `python3`（缺失不阻断结论，仅不入账）。
+Requirements: ZCode desktop (the dynamic-workflows runtime is bundled). The run ledger uses `python3` if present (missing python3 does not block conclusions; the run is just not logged).
 
-## 使用
+## Usage
 
-装好后三种触发方式：
+Three ways to trigger it once installed:
 
-- 自然语言：「用专家团评估一下 X」「让专家团给个结论」「这个问题帮我多视角把关」
-- 斜杠命令：`/expert-panel <你的问题>`
-- 直接调用：`CreateWorkflow(path=<插件内 workflows/expert-panel.dwf.ts>, args={...})`
+- Natural language: "use the expert panel to evaluate X", "have the expert panel settle this", "give this decision a multi-perspective check"
+- Slash command: `/expert-panel <your question>`
+- Direct call: `CreateWorkflow(path=<the plugin's workflows/expert-panel.dwf.ts>, args={...})`
 
-### 参数
+### Parameters
 
-| 参数 | 类型 | 默认 | 说明 |
+| Parameter | Type | Default | Description |
 |---|---|---|---|
-| question | string | 必填 | 要专家团给出稳定结论的问题/决策 |
-| profile | string | standard | quick（3 专家/1 轮，数分钟）\| standard（2 轮）\| deep（自动补反方质询+综合连接原型，2 轮） |
-| experts | json | [务实工程师, 风险与边界审查, 产品价值] | 专家视角名数组（勿重复） |
-| threshold | number | 0.6 | 共识率阈值，低于自动加辩一轮 |
-| max_rounds | number | quick=1，其余=2 | 最大轮数（含首轮） |
-| evidence | json | 空 | 证据包：文本或文件路径数组（专家/复核员用工具自行读取） |
-| basis | json | 空 | 评测依据：文件路径或条目数组，要求逐条对照判定并引用条目 |
-| ledger_path | string | ~/.expert-panel/ledger.jsonl | 运行台账 JSONL 落盘路径 |
-| simulate_failures | json | 空 | 测试用：模拟作答失败的专家下标 |
+| question | string | required | The question/decision the panel should settle |
+| profile | string | standard | quick (3 experts/1 round, minutes) \| standard (2 rounds) \| deep (auto-adds contrarian + synthesizer lenses, 2 rounds) |
+| experts | json | [务实工程师, 风险与边界审查, 产品价值] | Expert lens names (no duplicates) |
+| threshold | number | 0.6 | Consensus-rate threshold; below it one extra debate round runs |
+| max_rounds | number | quick=1, else 2 | Max rounds including the first |
+| evidence | json | empty | Evidence pack: texts or file paths (experts/verifier read files with their own tools) |
+| basis | json | empty | Review rubric: file paths or entries; when given, verdicts must cite the rubric item by item |
+| ledger_path | string | ~/.expert-panel/ledger.jsonl | Run ledger JSONL path |
+| simulate_failures | json | empty | Test-only: indexes of experts to simulate as failed |
 
-### 模型选择
+### Model selection
 
-默认所有角色用会话默认模型——这是刻意设计：**零配置、在任何 ZCode 环境都能跑**。要统一换模型，在 `CreateWorkflow` 调用上传 `subagent_model`（用 `ListModels` 查当前 provider 可用的 id）。按角色分模型（如互评用轻量模型）宿主刻意不支持：子代理模型必须在运行前已知。
+By default every role uses the session default model — this is deliberate: **zero config, runs on any ZCode environment**. To switch models uniformly, pass `subagent_model` on the `CreateWorkflow` call (look up ids with `ListModels` on the current provider). Per-role model routing is intentionally unsupported by the host: a subagent's model must be known before the run starts.
 
-### 结果解读
+### Interpreting results
 
-- `agreementRate ≥ threshold`：达成共识。`agreed` 为经复核的稳定结论；`unverifiable` 是价值判断类（无法客观复核，仅代表专家团意见）。
-- `< threshold`：`disputed` 已列明各方论据，交人工裁决——**这是特性不是失败**。
-- `absent` 非空或有效专家 < 2：结论已标注样本完整度，引用时注意口径。
+- `agreementRate ≥ threshold`: consensus reached. `agreed` holds verified stable conclusions; `unverifiable` holds value judgements (cannot be objectively verified — they are the panel's opinion only).
+- `< threshold`: `disputed` lists each side's arguments for human adjudication — **this is a feature, not a failure**.
+- `absent` non-empty or fewer than 2 valid experts: the conclusion is annotated with sample completeness; mind the caveat when quoting.
 
-### 30 秒验证（装完即测）
+Each run appends one ledger line (`ledger_path`): question digest / profile / expert counts / rounds / consensus rate / agreed·disputed·rejected counts / stable flag.
 
-新会话里发一句：
+### 30-second verification
+
+In a new session, send:
 
 ```
-用专家团 quick 档评估：个人知识库用 Markdown 文件还是笔记软件？
+Use the expert panel, quick profile, to evaluate: Markdown files vs a notes app for a personal knowledge base?
 ```
 
-预期输出（数分钟内）：一张「专家团结论」卡片，含共识率百分比（如 74%）、一致项清单（带复核标记）、分歧项清单（若有）、执行摘要与最终建议；运行中可见专家状态看板从「独立作答」推进到「已收敛」。共识率低于 60% 时会自动加辩一轮并明示分歧——同样算工作正常。
+Expected (within minutes): an "Expert Panel Conclusion" card with a consensus rate (e.g. 74%), agreed items (with verification marks), disputed items (if any), an executive summary and a final recommendation; while running, the expert board advances from "independent answering" to "converged". A rate below 60% triggers an extra debate round and explicit disagreements — that is also normal behavior.
 
-每次运行一行追加台账（`ledger_path`）：问题摘要 / 档位 / 专家数 / 有效数 / 轮数 / 共识率 / 一致·分歧·剔除计数 / 是否达成。
+## Data behavior & uninstall
 
-## 输出形态
+- Each run appends one JSONL line to `~/.expert-panel/ledger.jsonl` (relocate via `ledger_path`); beyond that it **writes nothing** — no hooks, no MCP server, no outbound network requests (review subagents only use your current session's own model channel).
+- Uninstall: Settings → Plugins → expert-panel → Uninstall. The only residue is `~/.expert-panel/` (the ledger dir); delete it to remove everything.
 
-运行中：专家团状态看板（独立作答→交叉互评→修订表态→已收敛）+ 共识率收敛曲线 + 指标条。
-结束后：主产物为一份结论卡片（一致项/分歧项/复核剔除/执行摘要/最终建议/仲裁附录），并返回结构化 JSON（供编排方程序化消费）。
+## Design notes
 
-## 数据行为与卸载
-
-- 每次运行追加一行 JSONL 到 `~/.expert-panel/ledger.jsonl`（可用 `ledger_path` 改路径）；除此之外**不写任何文件**，无 hooks、无 MCP server、无出站网络请求（评审子代理只用你当前会话本身的模型通道）。
-- 卸载：Settings → Plugins → expert-panel → 卸载。残留物仅 `~/.expert-panel/`（台账目录），删除即彻底清除。
-
-## 设计说明
-
-- **匿名协议**：互评阶段输入仅含匿名标签/立场/要点；视角名只在独立作答阶段存在于各自的 system prompt 中。
-- **共识率确定性**：脚本按 `一致/(一致+分歧)` 计算，轮间比较与加辩门控全部基于该值，模型无法影响分母分子之外的东西。
-- **deep 档护栏**：强制包含反共识原型（Contrarian），对冲「辩论放大偏差共识」；人数不足再补综合连接（Synthesizer）。
-- **渊源**：机制蓝本来自 karpathy/llm-council 的匿名互评与主席制思想 + 本作者在 ZCode 上长期使用的 expert-panel 工作流实证迭代（v2.1：评测依据注入、单专家容错、样本完整度标注）。
+- **Anonymity protocol**: critique inputs carry only anonymous labels/positions/key points; lens names exist only inside each expert's own system prompt during independent answering.
+- **Deterministic consensus rate**: the script computes `agreed/(agreed+disputed)`; round gating keys off that value alone — a model cannot shade the arithmetic.
+- **Deep-profile guardrail**: a contrarian lens is mandatory (to counter "debate amplifying biased consensus"); a synthesizer is added when headcount is short.
+- **Origins**: the mechanism draws on the anonymous cross-critique and chair ideas of karpathy/llm-council, plus the author's own expert-panel workflow iterated in production on ZCode (v2.1: rubric injection, single-expert fault tolerance, sample-completeness annotation). No code was copied from llm-council (which currently ships no license); this plugin is an independent implementation, MIT-licensed.
 
 ## Changelog
 
-版本以插件市场显示为准（事实源在 plugin.json）。
+Version is whatever the marketplace shows (the source of truth is plugin.json).
 
-- 0.1.1：修复自定义 ledger_path 为裸文件名时无法落账的边界问题；开源前清理（git 历史中性身份）。
-- 0.1.0：首个可发布版本，六阶段机制全量移植。
+- 0.1.1: fix ledger write for bare-filename custom paths; pre-release cleanup (neutral git identity).
+- 0.1.0: first releasable version, full six-stage mechanism.
 
 ## License
 
-MIT（见 [LICENSE](LICENSE)）
+MIT — see [LICENSE](LICENSE)
